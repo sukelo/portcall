@@ -7,8 +7,9 @@
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
-import { optional, required } from './src/config.js';
+import { boolean, optional, required } from './src/config.js';
 import { kisPlugin } from './src/plugins/kis/index.js';
+import { macbookPlugin } from './src/plugins/macbook/index.js';
 import { vaultPlugin } from './src/plugins/vault/index.js';
 import type { Plugin } from './src/types.js';
 
@@ -59,6 +60,9 @@ export const plugins: Plugin[] = [
     path: 'vault',
     importRoots: vaultImportRoots(),
   }),
+  // Needs no credentials, so it is always mounted. `macbook_memory_apps` names the
+  // apps that are running, so that one tool has its own off switch.
+  macbookPlugin({ path: 'macbook', apps: boolean('PORTCALL_MACBOOK_APPS', true) }),
   ...(kisAppKey === undefined
     ? []
     : [

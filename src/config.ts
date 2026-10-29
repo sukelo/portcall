@@ -23,7 +23,7 @@ function integer(name: string, fallback: number): number {
   return parsed;
 }
 
-function boolean(name: string, fallback: boolean): boolean {
+export function boolean(name: string, fallback: boolean): boolean {
   const raw = optional(name)?.toLowerCase();
   if (raw === undefined) return fallback;
   if (['1', 'true', 'yes', 'on'].includes(raw)) return true;

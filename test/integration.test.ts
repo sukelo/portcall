@@ -18,7 +18,7 @@ describe('mounts and routing', () => {
     const body = (await res.json()) as { status: string; authRequired: boolean; mounts: { route: string }[] };
     assert.equal(body.status, 'ok');
     assert.equal(body.authRequired, false);
-    assert.deepEqual(body.mounts.map((m) => m.route).sort(), ['/mcp', '/vault/mcp']);
+    assert.deepEqual(body.mounts.map((m) => m.route).sort(), ['/macbook/mcp', '/mcp', '/vault/mcp']);
   });
 
   test('the alias serves the same plugin as the canonical route', async () => {
@@ -239,7 +239,11 @@ describe('secret path prefix', () => {
     assert.equal(res.status, 200);
 
     const body = (await res.json()) as { mounts: { route: string }[] };
-    assert.deepEqual(body.mounts.map((m) => m.route).sort(), [`/${prefix}/mcp`, `/${prefix}/vault/mcp`]);
+    assert.deepEqual(body.mounts.map((m) => m.route).sort(), [
+      `/${prefix}/macbook/mcp`,
+      `/${prefix}/mcp`,
+      `/${prefix}/vault/mcp`,
+    ]);
   });
 
   test('a 404 body reveals nothing about the prefix', async () => {
@@ -266,7 +270,7 @@ describe('the KIS plugin', () => {
     const without = await startServer({});
     try {
       const body = (await (await fetch(`${without.baseUrl}/healthz`)).json()) as { mounts: { route: string }[] };
-      assert.deepEqual(body.mounts.map((m) => m.route), ['/vault/mcp']);
+      assert.deepEqual(body.mounts.map((m) => m.route).sort(), ['/macbook/mcp', '/vault/mcp']);
     } finally {
       await without.stop();
     }
@@ -274,7 +278,7 @@ describe('the KIS plugin', () => {
     const server = await startServer(credentials);
     try {
       const body = (await (await fetch(`${server.baseUrl}/healthz`)).json()) as { mounts: { route: string }[] };
-      assert.deepEqual(body.mounts.map((m) => m.route).sort(), ['/kis/mcp', '/vault/mcp']);
+      assert.deepEqual(body.mounts.map((m) => m.route).sort(), ['/kis/mcp', '/macbook/mcp', '/vault/mcp']);
     } finally {
       await server.stop();
     }
@@ -480,5 +484,45 @@ describe('a hostile request target', () => {
     const stillBlocked = await fetch(`${server.baseUrl}/vault/mcp`, { method: 'POST', headers: guessing });
     assert.equal(stillBlocked.status, 429, 'the block survives the malformed target');
     await stillBlocked.text();
+  });
+});
+
+describe('the macbook plugin', () => {
+  async function listTools(env: Record<string, string>): Promise<string[]> {
+    const server = await startServer(env);
+    try {
+      const payload = await readRpc(await modernRequest(server.baseUrl, '/macbook/mcp', 'tools/list'));
+      return (payload.result as { tools: { name: string }[] }).tools.map((t) => t.name).sort();
+    } finally {
+      await server.stop();
+    }
+  }
+
+  test('is mounted with no configuration, app list included', async () => {
+    assert.deepEqual(await listTools({}), ['macbook_memory_apps', 'macbook_status']);
+  });
+
+  test('PORTCALL_MACBOOK_APPS=off removes the app list and keeps the status', async () => {
+    assert.deepEqual(await listTools({ PORTCALL_MACBOOK_APPS: 'off' }), ['macbook_status']);
+  });
+
+  // The one test that runs the real commands. They are macOS tools, and the
+  // values are the machine's own, so it checks shape and not content.
+  test('reads every section on a real Mac', { skip: process.platform !== 'darwin' }, async () => {
+    const server = await startServer({});
+    try {
+      const payload = await readRpc(
+        await modernRequest(server.baseUrl, '/macbook/mcp', 'tools/call', { name: 'macbook_status', arguments: {} }),
+      );
+      const data = (payload.result as { structuredContent: Record<string, Record<string, unknown>> }).structuredContent;
+
+      for (const name of ['battery', 'thermal', 'memory', 'disk', 'system']) {
+        assert.ok(data[name] !== undefined && !('error' in data[name]), `${name} was read`);
+      }
+      assert.equal(typeof data['disk']!['usedPercent'], 'number');
+      assert.equal(typeof data['memory']!['freePercent'], 'number');
+    } finally {
+      await server.stop();
+    }
   });
 });
