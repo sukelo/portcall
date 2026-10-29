@@ -68,16 +68,21 @@ async function openTools(body: Record<string, unknown> = { rt_cd: '0', output: {
   };
 }
 
-/** The date in Seoul right now, worked out independently of the code under test. */
-function seoulToday(): string {
+/** The date in Seoul `daysFromNow` days away, worked out independently of the code under test. */
+function seoulDate(daysFromNow = 0): string {
   return new Intl.DateTimeFormat('en-CA', {
     timeZone: 'Asia/Seoul',
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
   })
-    .format(new Date())
+    .format(new Date(Date.now() + daysFromNow * 24 * 60 * 60 * 1000))
     .replaceAll('-', '');
+}
+
+/** The date in Seoul right now. */
+function seoulToday(): string {
+  return seoulDate();
 }
 
 describe('KIS date defaults', () => {
@@ -506,6 +511,12 @@ describe('what the KIS mount exposes', () => {
 });
 
 describe('overseas dividends', () => {
+  // "Announced, not yet paid" is a statement about today, so these dates are
+  // worked out from today. Written into the fixture, a date stops being
+  // upcoming the day it passes — this test failed on 2026-10-01 that way.
+  const UPCOMING_RECORD = seoulDate(30);
+  const UPCOMING_PAY = seoulDate(35);
+
   const DIVIDEND_BODY = {
     rt_cd: '0',
     output: [
@@ -523,7 +534,7 @@ describe('overseas dividends', () => {
     ],
     output1: [
       { ca_title: '현금배당', record_dt: '20260901', div_lock_dt: '20260901', pay_dt: '20260904' },
-      { ca_title: '현금배당', record_dt: '20261001', div_lock_dt: '20261001', pay_dt: '20261006' },
+      { ca_title: '현금배당', record_dt: UPCOMING_RECORD, div_lock_dt: UPCOMING_RECORD, pay_dt: UPCOMING_PAY },
     ],
   };
 
@@ -558,7 +569,7 @@ describe('overseas dividends', () => {
       assert.equal(held.dividends[0].payDate, '20260904', 'joined on acpl_bass_dt, not bass_dt');
       assert.equal(held.dividends[0].exDividendDate, '20260901');
       assert.equal(held.scheduled.length, 1, 'a declared-but-unpaid dividend is still worth returning');
-      assert.equal(held.scheduled[0].recordDate, '20261001');
+      assert.equal(held.scheduled[0].recordDate, UPCOMING_RECORD);
     } finally {
       await tools.close();
     }
