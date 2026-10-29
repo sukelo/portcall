@@ -68,13 +68,11 @@ export function kisPlugin(options: KisPluginOptions): Plugin {
   // would be thrown away between calls.
   const history = createHistoryStore({ client, cacheDir: historyCacheDir });
 
-  return {
-    name,
-    path,
-    handler: inProcess(name, () => {
-      const server = new McpServer({ name: 'portcall-kis', version: '0.1.0' });
-      registerTools(server, client, account, history);
-      return server;
-    }),
+  const factory = () => {
+    const server = new McpServer({ name: 'portcall-kis', version: '0.1.0' });
+    registerTools(server, client, account, history);
+    return server;
   };
+
+  return { name, path, handler: inProcess(name, factory), factory };
 }

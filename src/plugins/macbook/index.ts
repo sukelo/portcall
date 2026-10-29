@@ -62,13 +62,11 @@ export function macbookPlugin(options: MacbookPluginOptions = {}): Plugin {
   const name = `macbook(${path})`;
   const host = realHost();
 
-  return {
-    name,
-    path,
-    handler: inProcess(name, () => {
-      const server = new McpServer({ name: 'portcall-macbook', version: '0.1.0' });
-      registerTools(server, host, { apps });
-      return server;
-    }),
+  const factory = () => {
+    const server = new McpServer({ name: 'portcall-macbook', version: '0.1.0' });
+    registerTools(server, host, { apps });
+    return server;
   };
+
+  return { name, path, handler: inProcess(name, factory), factory };
 }

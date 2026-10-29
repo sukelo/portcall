@@ -6,7 +6,7 @@ import type { Plugin } from '../src/types.js';
 
 /** A plugin stub — resolveMounts never touches the handler. */
 function stub(name: string, path: string): Plugin {
-  return { name, path, handler: {} as Plugin['handler'] };
+  return { name, path, handler: {} as Plugin['handler'], factory: {} as Plugin['factory'] };
 }
 
 describe('resolveMounts', () => {
@@ -23,6 +23,23 @@ describe('resolveMounts', () => {
     assert.equal(mounts.get('/vault/mcp'), vault);
     // Identity matters: the server derives one adapter per plugin instance.
     assert.equal(mounts.get('/mcp'), mounts.get('/vault/mcp'));
+  });
+
+  test('a root plugin is served at /mcp without being mounted by its own path', () => {
+    const vault = stub('vault', 'vault');
+    const all = stub('all', '*');
+    const mounts = resolveMounts([vault], { rootPlugin: all });
+
+    assert.equal(mounts.get('/mcp'), all);
+    assert.equal(mounts.get('/vault/mcp'), vault);
+    assert.deepEqual([...mounts.keys()].sort(), ['/mcp', '/vault/mcp']);
+  });
+
+  test('a root plugin follows the secret prefix like every other mount', () => {
+    const all = stub('all', '*');
+    const mounts = resolveMounts([stub('vault', 'vault')], { rootPlugin: all, pathPrefix: 's3cret' });
+    assert.equal(mounts.get('/s3cret/mcp'), all);
+    assert.equal(mounts.has('/mcp'), false);
   });
 
   test('no alias is added when none is configured', () => {

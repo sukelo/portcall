@@ -47,6 +47,49 @@ describe('mounts and routing', () => {
   });
 });
 
+describe('the root mount serves every plugin', () => {
+  let server: RunningServer;
+
+  before(async () => {
+    server = await startServer({ PORTCALL_ALIAS_ROOT_MCP: '*' });
+  });
+  after(async () => server.stop());
+
+  const names = (payload: Record<string, unknown>) =>
+    ((payload.result as { tools: { name: string }[] }).tools).map((t) => t.name).sort();
+
+  test('/mcp lists the union of the other mounts', async () => {
+    const [vault, macbook, root] = await Promise.all(
+      ['/vault/mcp', '/macbook/mcp', '/mcp'].map(async (path) =>
+        names(await readRpc(await modernRequest(server.baseUrl, path, 'tools/list'))),
+      ),
+    );
+
+    assert.ok(vault!.length > 0 && macbook!.length > 0);
+    assert.deepEqual(root, [...vault!, ...macbook!].sort());
+  });
+
+  test('a vault tool and a macbook tool both answer through /mcp', async () => {
+    const stats = await readRpc(
+      await modernRequest(server.baseUrl, '/mcp', 'tools/call', { name: 'get_vault_stats', arguments: {} }),
+    );
+    const parsed = JSON.parse((stats.result as { content: { text: string }[] }).content[0]!.text) as { notes: number };
+    assert.equal(parsed.notes, 2);
+
+    const status = await readRpc(
+      await modernRequest(server.baseUrl, '/mcp', 'tools/call', { name: 'macbook_status', arguments: {} }),
+    );
+    assert.equal(status.error, undefined);
+    assert.ok(Array.isArray((status.result as { content: unknown[] }).content));
+  });
+
+  test('the individual mounts are still there', async () => {
+    const res = await fetch(`${server.baseUrl}/healthz`);
+    const body = (await res.json()) as { mounts: { route: string }[] };
+    assert.deepEqual(body.mounts.map((m) => m.route).sort(), ['/macbook/mcp', '/mcp', '/vault/mcp']);
+  });
+});
+
 describe('protocol eras', () => {
   let server: RunningServer;
 

@@ -1,4 +1,4 @@
-import type { McpHttpHandler } from '@modelcontextprotocol/server';
+import type { McpHttpHandler, McpServerFactory } from '@modelcontextprotocol/server';
 
 /**
  * A mounted MCP server.
@@ -13,4 +13,11 @@ export interface Plugin {
   path: string;
   /** The web-standard MCP handler serving this mount. */
   handler: McpHttpHandler;
+  /**
+   * The factory `handler` was built from.
+   *
+   * Kept so the root mount can put this plugin's tools behind a server of its
+   * own; it is the same factory, so a tool means the same thing at either URL.
+   */
+  factory: McpServerFactory;
 }

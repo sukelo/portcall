@@ -4,6 +4,13 @@ export interface MountOptions {
   /** Also serve the named plugin at the prefix root, e.g. `/mcp`. */
   aliasRootMcp?: string | undefined;
   /**
+   * Serve this plugin at the prefix root instead of an alias.
+   *
+   * For a plugin that is not itself mounted, such as the one that fronts all
+   * the others. Wins over `aliasRootMcp`.
+   */
+  rootPlugin?: Plugin | undefined;
+  /**
    * Secret path segment every mount is served under.
    *
    * Clients that cannot send a request header (Claude's custom connector among
@@ -31,7 +38,7 @@ function assertSegment(value: string, what: string): void {
  * rather than an error — can be checked directly.
  */
 export function resolveMounts(plugins: Plugin[], options: MountOptions = {}): Map<string, Plugin> {
-  const { aliasRootMcp, pathPrefix } = options;
+  const { aliasRootMcp, rootPlugin, pathPrefix } = options;
 
   if (pathPrefix !== undefined) assertSegment(pathPrefix, 'PORTCALL_PATH_PREFIX');
   const base = pathPrefix === undefined ? '' : `/${pathPrefix}`;
@@ -47,7 +54,9 @@ export function resolveMounts(plugins: Plugin[], options: MountOptions = {}): Ma
     mounts.set(route, plugin);
   }
 
-  if (aliasRootMcp !== undefined) {
+  if (rootPlugin !== undefined) {
+    mounts.set(`${base}/mcp`, rootPlugin);
+  } else if (aliasRootMcp !== undefined) {
     const target = mounts.get(`${base}/${aliasRootMcp}/mcp`);
     if (target === undefined) {
       throw new Error(`PORTCALL_ALIAS_ROOT_MCP points at unknown plugin path: ${aliasRootMcp}`);

@@ -432,7 +432,7 @@ All host-specific values come from the environment.
 | `PORTCALL_PORT` | `7100` | TCP port |
 | `PORTCALL_HOST` | `127.0.0.1` | Bind interface |
 | `PORTCALL_TOKEN` | *(unset)* | Static bearer token. Unset means no authentication |
-| `PORTCALL_ALIAS_ROOT_MCP` | *(unset)* | Also mount the named plugin at `/mcp` |
+| `PORTCALL_ALIAS_ROOT_MCP` | *(unset)* | Also mount the named plugin at `/mcp`. `*` mounts every plugin there instead (see below) |
 | `PORTCALL_PATH_PREFIX` | *(unset)* | Serve every mount under `/<prefix>/…` |
 | `PORTCALL_KEEPALIVE_MS` | `15000` | SSE keepalive interval; `0` disables |
 | `PORTCALL_MODERN_ONLY` | `false` | Reject 2025-era requests instead of serving them |
@@ -445,6 +445,14 @@ All host-specific values come from the environment.
 | `KIS_APP_KEY` | *(unset)* | Korea Investment app key. Unset leaves the KIS mount off entirely |
 | `KIS_APP_SECRET` | *(required with the key)* | App secret paired with `KIS_APP_KEY` |
 | `KIS_ACCOUNT` | *(unset)* | Account number, `12345678-01`. Unset serves quotations only |
+
+`PORTCALL_ALIAS_ROOT_MCP=*` makes `/mcp` one server carrying every plugin's
+tools, so a single connector reaches all of them and a plugin added later
+needs no new registration. The per-plugin mounts stay, for a client that
+should see only one. Tool names are shared at that level: if two plugins
+claim one, the earlier plugin keeps it and the other's is left out of the
+listing, with an error in the log. Only tools are forwarded — a plugin that
+grows resources or prompts has to be taught to the root mount first.
 
 `PORTCALL_TOKEN` gates every mount with `Authorization: Bearer <token>`. Note
 that some MCP clients — Claude's custom connector UI among them — offer no way

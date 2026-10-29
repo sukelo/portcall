@@ -5,6 +5,7 @@ import { toNodeHandler } from '@modelcontextprotocol/node';
 import type { NodeIncomingMessageLike, NodeMcpRequestHandler } from '@modelcontextprotocol/node';
 
 import { plugins } from '../plugins.config.js';
+import { aggregatePlugin } from './aggregate.js';
 import { isAuthorized } from './auth.js';
 import { config } from './config.js';
 import { clientAddress, createGuard, isLoopback } from './guard.js';
@@ -13,6 +14,8 @@ import { detailedHealthRoute, resolveMounts, routeKey } from './routes.js';
 import type { Plugin } from './types.js';
 
 const startedAt = Date.now();
+
+const ALL_PLUGINS = '*';
 
 const guard = createGuard({
   failureLimit: config.guardFailureLimit,
@@ -83,8 +86,20 @@ function buildRoutes(mounts: Map<string, Plugin>): Map<string, Route> {
   return routes;
 }
 
+/**
+ * `PORTCALL_ALIAS_ROOT_MCP=*` serves every plugin behind the root URL; any
+ * other value aliases that one plugin there.
+ */
+const rootPlugin = config.aliasRootMcp === ALL_PLUGINS ? aggregatePlugin(plugins) : undefined;
+
+const served = rootPlugin === undefined ? plugins : [...plugins, rootPlugin];
+
 const routes = buildRoutes(
-  resolveMounts(plugins, { aliasRootMcp: config.aliasRootMcp, pathPrefix: config.pathPrefix }),
+  resolveMounts(plugins, {
+    aliasRootMcp: rootPlugin === undefined ? config.aliasRootMcp : undefined,
+    rootPlugin,
+    pathPrefix: config.pathPrefix,
+  }),
 );
 const healthRoute = detailedHealthRoute(config.pathPrefix);
 
@@ -196,7 +211,7 @@ for (const signal of ['SIGINT', 'SIGTERM'] as const) {
     log.info('shutting down', { signal });
 
     httpServer.close(() => {
-      Promise.allSettled(plugins.map((plugin) => plugin.handler.close()))
+      Promise.allSettled(served.map((plugin) => plugin.handler.close()))
         .then(() => process.exit(0))
         .catch(() => process.exit(1));
     });

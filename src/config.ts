@@ -47,6 +47,8 @@ export const config = {
   /**
    * Mount the plugin with this `path` at `/mcp` as well as `/<path>/mcp`.
    * Useful when migrating clients that are already pointed at `/mcp`.
+   *
+   * `*` serves every plugin at `/mcp` instead, so one connector reaches all.
    */
   aliasRootMcp: optional('PORTCALL_ALIAS_ROOT_MCP'),
 

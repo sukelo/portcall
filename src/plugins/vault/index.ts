@@ -36,14 +36,11 @@ export function vaultPlugin(options: VaultPluginOptions): Plugin {
   const name = `mcpvault(${path})`;
   const extras = [...imageTools({ vaultPath, readOnly, importRoots }), ...historyTools({ vaultPath })];
 
-  return {
-    name,
-    path,
-    handler: inProcess(name, () =>
-      mergeTools(() => createServer(vaultPath, { readOnly }), extras, {
-        name: 'portcall-vault',
-        version: '0.1.0',
-      }),
-    ),
-  };
+  const factory = () =>
+    mergeTools(() => createServer(vaultPath, { readOnly }), extras, {
+      name: 'portcall-vault',
+      version: '0.1.0',
+    });
+
+  return { name, path, handler: inProcess(name, factory), factory };
 }
